@@ -919,8 +919,27 @@ def unserialize_msa(
     paired_msa = [""] * len(query_seq_len)
     unpaired_msa = [""] * len(query_seq_len)
     already_in = dict()
+    if (len(a3m_lines) - 1) % 2 != 0:
+        logger.warning(
+            "A3M parse warning: odd number of lines detected (%d). File may be truncated",
+            len(a3m_lines),
+        )
+
     for i in range(1, len(a3m_lines), 2):
         header = a3m_lines[i]
+        if i + 1 >= len(a3m_lines):
+            logger.warning(
+                "A3M parse warning: missing sequence line after header '%s' at line %d",
+                header,
+                i,
+            )
+            break
+        if not header.startswith(">"):
+            logger.warning(
+                "A3M parse warning: header line %d does not start with '>'",
+                i,
+            )
+            continue
         seq = a3m_lines[i + 1]
         if (header, seq) in already_in:
             continue
@@ -943,6 +962,28 @@ def unserialize_msa(
                 curr_seq_len += 1
             seqs_line.append(paired_seq)
 
+        for sl, expected_len in zip(seqs_line, query_seq_len):
+            if len(sl) < expected_len:
+                logger.warning(
+                    "A3M parse warning: sequence shorter than expected (%d < %d) for header '%s'",
+                    len(sl),
+                    expected_len,
+                    header,
+                )
+            elif len(sl) > expected_len:
+                logger.warning(
+                    "A3M parse warning: sequence longer than expected (%d > %d) for header '%s'",
+                    len(sl),
+                    expected_len,
+                    header,
+                )
+
+        if prev_pos < len(seq) and seq[prev_pos:].strip():
+            logger.warning(
+                "A3M parse warning: extra characters detected after expected sequence for header '%s'",
+                header,
+            )
+
         # if sequence is paired add them to output
         if (
             not is_single_protein
@@ -956,6 +997,12 @@ def unserialize_msa(
                     paired_msa[j] += ">" + header_no_faster_split[j] + "\n"
                     paired_msa[j] += seqs_line[j] + "\n"
             else:
+                logger.warning(
+                    "A3M parse warning: header field count (%d) does not match sequence count (%d) for header '%s'",
+                    len(header_no_faster_split),
+                    len(seqs_line),
+                    header,
+                )
                 # fall back to unpaired if header does not match sequence count
                 for j, seq in enumerate(seqs_line):
                     if has_amino_acid[j]:
