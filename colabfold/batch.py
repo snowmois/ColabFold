@@ -947,13 +947,20 @@ def unserialize_msa(
         if (
             not is_single_protein
             and not is_homooligomer
-            and sum(has_amino_acid) > 1 # at least 2 sequences are paired
+            and sum(has_amino_acid) > 1  # at least 2 sequences are paired
         ):
             header_no_faster = header.replace(">", "")
             header_no_faster_split = header_no_faster.split("\t")
-            for j in range(0, len(seqs_line)):
-                paired_msa[j] += ">" + header_no_faster_split[j] + "\n"
-                paired_msa[j] += seqs_line[j] + "\n"
+            if len(header_no_faster_split) == len(seqs_line):
+                for j in range(0, len(seqs_line)):
+                    paired_msa[j] += ">" + header_no_faster_split[j] + "\n"
+                    paired_msa[j] += seqs_line[j] + "\n"
+            else:
+                # fall back to unpaired if header does not match sequence count
+                for j, seq in enumerate(seqs_line):
+                    if has_amino_acid[j]:
+                        unpaired_msa[j] += header + "\n"
+                        unpaired_msa[j] += seq + "\n"
         else:
             for j, seq in enumerate(seqs_line):
                 if has_amino_acid[j]:
